@@ -5,9 +5,28 @@
 
 using namespace std;
 
+void EnableDebugPriv()
+{
+	HANDLE hToken;
+	LUID luid;
+	TOKEN_PRIVILEGES tkp;
+
+	OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken);
+
+	LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &luid);
+
+	tkp.PrivilegeCount = 1;
+	tkp.Privileges[0].Luid = luid;
+	tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+	AdjustTokenPrivileges(hToken, false, &tkp, sizeof(tkp), NULL, NULL);
+
+	CloseHandle(hToken);
+}
+
 void printProcessInfo(PROCESSENTRY32 pe32_)
 {
-	cout << "Process ID: " << pe32_.th32ProcessID << endl;
+	wcout << "Process ID: " << pe32_.th32ProcessID << " Name: " << pe32_.szExeFile << endl;
 }
 
 BOOL GetProcessList()
@@ -36,6 +55,13 @@ BOOL GetProcessList()
 	do
 	{
 		printProcessInfo(pe32);
+
+		DWORD processId = pe32.th32ProcessID;
+		HANDLE process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, processId);
+		if (process == nullptr) {
+			cerr << "Unable to OpenProcess() " << processId << endl;
+			continue;
+		}	
 	} while ( Process32Next(processes, &pe32) );
 
 
@@ -46,9 +72,13 @@ BOOL GetProcessList()
 
 int main()
 {
+	EnableDebugPriv();
+
 	cout << "Hello world!" << endl;
 
 	GetProcessList();
+
+	Sleep(20000);
 
 	return 0;
 }
